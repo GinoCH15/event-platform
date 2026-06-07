@@ -3,7 +3,7 @@ WORKDIR /src
 COPY ["NotificationService.csproj", "./"]
 RUN dotnet restore
 COPY . .
-RUN dotnet publish -c Release --no-restore -o /app/publish
+RUN dotnet publish -c Release -o /app/publish
 
 FROM --platform=linux/amd64 mcr.microsoft.com/dotnet/aspnet:9.0-bookworm-slim AS final
 WORKDIR /app
