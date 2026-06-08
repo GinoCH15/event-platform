@@ -1,4 +1,4 @@
-namespace NotificationService.Contracts;
+namespace EventService.Application.Events;
 
 /// <summary>
 /// Contrato del mensaje EventCreated — debe coincidir exactamente

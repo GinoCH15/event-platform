@@ -15,21 +15,22 @@ eventplatform/
 ├── docs/
 │   └── architecture.md         # Diagrama y sustentación de arquitectura
 ├── scripts/
-│   └── init-db.sql             # Script SQL de referencia del modelo
+│   ├── init-db.sql             # Script SQL de referencia del modelo de datos
+│   └── demo-casos-de-uso.sh    # Demo interactivo de todos los patrones
 └── src/
     ├── EventService/           # API principal (.NET 9)
-    │   ├── Api/                # Controllers, Middleware
-    │   ├── Application/        # Commands, Queries (CQRS), DTOs
-    │   ├── Domain/             # Entidades, Reglas de negocio
-    │   └── Infrastructure/     # EF Core, Redis, Repositories
+    │   ├── Api/                # Controllers, Middleware (ExceptionMiddleware)
+    │   ├── Application/        # Commands, Queries (CQRS + MediatR), DTOs
+    │   ├── Domain/             # Entidades DDD con invariantes, DomainException
+    │   └── Infrastructure/     # EF Core + PostgreSQL, Redis, Repositories
     ├── NotificationService/    # Consumidor de eventos (.NET 9)
     │   ├── Application/        # Consumers (MassTransit)
-    │   ├── Contracts/          # Mensajes compartidos
-    │   └── Infrastructure/     # MongoDB context
+    │   ├── Contracts/          # Mensajes compartidos (EventCreatedMessage)
+    │   └── Infrastructure/     # MongoDB context, idempotencia
     └── Frontend/               # React 18 + TypeScript
         └── src/
             ├── pages/          # CreateEventPage, EventListPage
-            ├── services/       # API client (axios)
+            ├── services/       # API client (axios + JWT)
             └── types/          # TypeScript types
 ```
 
@@ -38,7 +39,7 @@ eventplatform/
 ## 🚀 Levantar el Proyecto (Docker)
 
 ### Prerrequisitos
-- Docker Desktop 4.x+ o Podman Desktop
+- Docker Desktop 4.x+ con soporte Rosetta (Apple Silicon)
 - Git
 
 ### 1. Clonar el repositorio
@@ -52,17 +53,17 @@ cd eventplatform
 docker-compose up --build -d
 ```
 
-Esto levanta:
-| Servicio             | Puerto | URL                          |
-|----------------------|--------|------------------------------|
-| **Frontend**         | 3000   | http://localhost:3000        |
-| **EventService API** | 5000   | http://localhost:5000        |
-| **Swagger**          | 5000   | http://localhost:5000/swagger|
-| **NotificationSvc**  | 5001   | http://localhost:5001/health |
-| **RabbitMQ UI**      | 15672  | http://localhost:15672       |
-| **PostgreSQL**       | 5432   | localhost:5432               |
-| **MongoDB**          | 27017  | localhost:27017              |
-| **Redis**            | 6379   | localhost:6379               |
+Esto levanta automáticamente:
+| Servicio             | Puerto | URL                           |
+|----------------------|--------|-------------------------------|
+| **Frontend**         | 3001   | http://localhost:3001         |
+| **EventService API** | 5050   | http://localhost:5050         |
+| **Swagger**          | 5050   | http://localhost:5050/swagger |
+| **NotificationSvc**  | 5001   | http://localhost:5001/health  |
+| **RabbitMQ UI**      | 15672  | http://localhost:15672        |
+| **PostgreSQL**       | 5432   | localhost:5432                |
+| **MongoDB**          | 27017  | localhost:27017               |
+| **Redis**            | 6379   | localhost:6379                |
 
 > Credenciales RabbitMQ: `guest` / `guest`
 
@@ -109,7 +110,8 @@ dotnet ef database update
 dotnet ef migrations remove
 ```
 
-**El proyecto aplica migraciones y seed automáticamente** al arrancar en Development mode (ver `Program.cs` → `DbSeeder.SeedAsync`).
+**El proyecto aplica migraciones y seed automáticamente** al arrancar (ver `Program.cs` → `DbSeeder.SeedAsync`).  
+El seeder crea eventos de ejemplo en PostgreSQL para que el frontend muestre datos desde el primer arranque.
 
 ### NotificationService
 
@@ -125,7 +127,7 @@ dotnet run
 cd src/Frontend
 npm install
 
-# Desarrollo (proxy automático a localhost:5000)
+# Desarrollo (proxy automático a EventService en puerto 5050)
 npm run dev
 
 # Build producción
@@ -136,7 +138,12 @@ npm run build
 
 ## 🔑 Autenticación JWT
 
-La API usa JWT (HS256). Para el demo, se puede usar el token fijo incluido en el frontend.
+La API usa **JWT HS256**. Para el demo, el frontend incluye un token precargado y válido.
+
+**Token de demo** (rol `admin`, exp. lejana):
+```
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDEiLCJuYW1lIjoiQWRtaW4gVXNlciIsInJvbGUiOiJhZG1pbiIsImlzcyI6ImV2ZW50LXBsYXRmb3JtIiwiYXVkIjoiZXZlbnQtcGxhdGZvcm0tY2xpZW50cyIsImV4cCI6OTk5OTk5OTk5OX0.DuXXU8Ss3SG8WLSw3mTkgisAkvjnbezgSW_DXUk2Jhg
+```
 
 **Para generar un token válido**, usa cualquier herramienta JWT con:
 ```json
@@ -149,15 +156,15 @@ La API usa JWT (HS256). Para el demo, se puede usar el token fijo incluido en el
   "exp": 9999999999
 }
 ```
-Secret: `super-secret-key-for-demo-at-least-32-chars!`
+Secret: `super-secret-key-for-demo-at-least-32-chars!` · Algoritmo: `HS256`
 
-En **Swagger**: haz click en **Authorize** → `Bearer {token}`
+En **Swagger**: haz click en **Authorize** → pega `Bearer <token>`
 
 ---
 
 ## 📡 API Endpoints
 
-### EventService (`http://localhost:5000`)
+### EventService (`http://localhost:5050`)
 
 | Método | Endpoint              | Auth         | Descripción                          |
 |--------|-----------------------|--------------|--------------------------------------|
@@ -170,8 +177,10 @@ En **Swagger**: haz click en **Authorize** → `Bearer {token}`
 ### Ejemplo: Crear Evento
 
 ```bash
-curl -X POST http://localhost:5000/api/events \
-  -H "Authorization: Bearer {TOKEN}" \
+TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDEiLCJuYW1lIjoiQWRtaW4gVXNlciIsInJvbGUiOiJhZG1pbiIsImlzcyI6ImV2ZW50LXBsYXRmb3JtIiwiYXVkIjoiZXZlbnQtcGxhdGZvcm0tY2xpZW50cyIsImV4cCI6OTk5OTk5OTk5OX0.DuXXU8Ss3SG8WLSw3mTkgisAkvjnbezgSW_DXUk2Jhg"
+
+curl -X POST http://localhost:5050/api/events \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Festival Rock 2026",
@@ -188,36 +197,47 @@ curl -X POST http://localhost:5000/api/events \
 
 ## 🏗️ Arquitectura
 
-Ver [`docs/architecture.md`](docs/architecture.md) para el diagrama completo y sustentación.
+Ver [`docs/architecture.md`](docs/architecture.md) para el diagrama completo y sustentación técnica.
 
 ### Patrones implementados
 
-| Patrón               | Dónde                               |
-|----------------------|-------------------------------------|
-| **CQRS**             | EventService (MediatR)              |
-| **Repository**       | EventRepository + IUnitOfWork       |
-| **DDD**              | Entidades con invariantes de dominio|
-| **Event-Driven**     | EventCreated → RabbitMQ             |
-| **Idempotencia**     | NotificationService (MongoDB)       |
-| **Redis Cache**      | GET /events (TTL 5 min)             |
-| **Pipeline Behavior**| Validación automática (FluentVal.)  |
-| **Clean Architecture**| Domain → Application → Infrastructure|
+| Patrón                | Implementación                           | Dónde                              |
+|-----------------------|------------------------------------------|------------------------------------|
+| **Clean Architecture**| Domain → Application → Infrastructure   | EventService (capas separadas)     |
+| **DDD**               | `Event.Create()`, `DomainException`      | `Domain/Entities/Event.cs`         |
+| **CQRS**              | `CreateEventCommand`, `GetEventsQuery`   | Application + MediatR              |
+| **Pipeline Behavior** | `ValidationBehavior<,>`                  | FluentValidation automático        |
+| **Repository + UoW**  | `IEventRepository`, `IUnitOfWork`        | Infrastructure + EF Core           |
+| **Event-Driven**      | `EventCreatedMessage` → RabbitMQ         | MassTransit `IPublishEndpoint`     |
+| **Idempotencia**      | `ProcessedMessage` keyed by `MessageId`  | NotificationService + MongoDB      |
+| **Redis Cache**       | `IDistributedCache`, TTL 5/10 min        | GET /events, GET /events/{id}      |
+| **ExceptionMiddleware**| `DomainException`→422, `Validation`→400 | `Api/Middleware/`                  |
 
 ---
 
 ## 🧪 Flujo de Prueba
 
-1. Abre **http://localhost:3000** → pantalla de eventos
+1. Abre **http://localhost:3001** → pantalla de eventos
 2. Haz click en **"Crear Evento"** → completa el formulario
 3. Al guardar, el EventService:
-   - Persiste en PostgreSQL
+   - Valida con FluentValidation (pipeline behavior)
+   - Persiste en PostgreSQL (transacción)
    - Publica `EventCreated` en RabbitMQ
+   - Invalida el cache Redis
 4. El NotificationService:
-   - Consume el mensaje
-   - Verifica idempotencia en MongoDB
-   - Registra la notificación
-5. Verifica en **RabbitMQ UI** (localhost:15672) los mensajes
-6. Verifica en **GET /api/events** que se usa el cache Redis
+   - Consume el mensaje (MassTransit)
+   - Verifica idempotencia en MongoDB (`processed_messages`)
+   - Registra la notificación en MongoDB (`notifications`)
+5. Verifica en **RabbitMQ UI** (http://localhost:15672) los exchanges y colas
+6. Verifica en **GET /api/events** (primera llamada: MISS, segunda: HIT en logs)
+
+### Demo automatizado (todos los patrones)
+
+```bash
+bash scripts/demo-casos-de-uso.sh
+```
+
+Ejecuta 13 casos de uso cubriendo: autenticación, CRUD, validación, cache, mensajería, idempotencia y errores.
 
 ---
 

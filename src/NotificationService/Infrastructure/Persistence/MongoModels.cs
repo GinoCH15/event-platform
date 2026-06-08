@@ -27,7 +27,9 @@ public class NotificationRecord
     [BsonRepresentation(BsonType.String)]
     public Guid Id { get; set; } = Guid.NewGuid();
 
+    [BsonRepresentation(BsonType.String)]
     public Guid EventId { get; set; }
+    [BsonRepresentation(BsonType.String)]
     public Guid MessageId { get; set; }
     public string Type { get; set; } = default!;   // Email, SMS, Push
     public string Recipient { get; set; } = default!;

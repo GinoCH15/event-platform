@@ -1,3 +1,6 @@
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization;
+using MongoDB.Bson.Serialization.Serializers;
 using MongoDB.Driver;
 
 namespace NotificationService.Infrastructure.Persistence;
@@ -5,6 +8,12 @@ namespace NotificationService.Infrastructure.Persistence;
 public class NotificationMongoContext
 {
     private readonly IMongoDatabase _db;
+
+    static NotificationMongoContext()
+    {
+        // Configurar GuidRepresentation globalmente para evitar BsonSerializationException
+        BsonSerializer.RegisterSerializer(new GuidSerializer(GuidRepresentation.Standard));
+    }
 
     public NotificationMongoContext(IConfiguration config)
     {

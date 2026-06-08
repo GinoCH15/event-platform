@@ -1,6 +1,6 @@
 using MassTransit;
 using MongoDB.Driver;
-using NotificationService.Contracts;
+using EventService.Application.Events;
 using NotificationService.Infrastructure.Persistence;
 using Microsoft.Extensions.Logging;
 

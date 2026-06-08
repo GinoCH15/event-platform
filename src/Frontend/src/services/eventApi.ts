@@ -4,7 +4,7 @@ import type { CreateEventInput, EventDto, EventSummaryDto, PagedResult } from '.
 // Token fijo para demo (en producción vendría de un flujo OAuth2/OIDC)
 const DEMO_JWT = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.' +
   'eyJzdWIiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDEiLCJuYW1lIjoiQWRtaW4gVXNlciIsInJvbGUiOiJhZG1pbiIsImlzcyI6ImV2ZW50LXBsYXRmb3JtIiwiYXVkIjoiZXZlbnQtcGxhdGZvcm0tY2xpZW50cyIsImV4cCI6OTk5OTk5OTk5OX0.' +
-  'demo-signature';
+  'DuXXU8Ss3SG8WLSw3mTkgisAkvjnbezgSW_DXUk2Jhg';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? '',
